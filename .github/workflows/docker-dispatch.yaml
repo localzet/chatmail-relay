@@ -8,12 +8,12 @@ name: Trigger Docker build
 
 on:
   push:
-    branches: [main]
+    branches: [main, j4n/docker-build-trigger]
   workflow_dispatch:
 
 jobs:
   dispatch:
-    name: Dispatch to chatmail/docker
+    name: Dispatch build to chatmail/docker
     runs-on: ubuntu-latest
     if: github.repository == 'chatmail/relay'
     steps:
