@@ -1,0 +1,27 @@
+<svg width="432" height="432" viewBox="0 0 432 432" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(0,12) scale(0.84375)">
+    <path
+      d="
+        M140 180
+        Q140 140 180 140
+        L332 140
+        Q372 140 372 180
+        L372 280
+        Q372 320 332 320
+        L240 320
+        L190 370
+        L200 320
+        L180 320
+        Q140 320 140 280
+        Z
+      "
+      fill="url(#grad)"
+    />
+  </g>
+</svg>

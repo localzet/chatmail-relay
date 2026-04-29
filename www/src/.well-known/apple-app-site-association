@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["8Y86453UA8.com.mateo.chat", "8Y86453UA8.com.mateo.chat.desktop.electron", "8Y86453UA8.com.mateo.chat.desktop.tauri", "com.mateo.chat.desktop.tauri"],
+        "components": [
+          {
+            "#": "*&i*",
+            "comment": "Matches any URL with a fragment that contains &i and instructs the system to open it"
+          }
+        ]
+      }
+    ]
+  },
+  "appclips": {
+    "apps": ["8Y86453UA8.com.mateo.chat.Clip"]
+  }
+}

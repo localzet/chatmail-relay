@@ -1,6 +1,7 @@
 import hashlib
 import importlib.resources
 import re
+import shutil
 import time
 import traceback
 import webbrowser
@@ -15,6 +16,16 @@ from .genqr import gen_qr_png_data
 _MERGE_CONFLICT_RE = re.compile(
     r"^<<<<<<<.+^=======.+^>>>>>>>", re.DOTALL | re.MULTILINE
 )
+_SKIP_DIR_NAMES = {"node_modules", "qr-src", ".git", "__pycache__"}
+_SKIP_FILE_NAMES = {
+    ".gitignore",
+    "LICENSE",
+    "README.md",
+    "mocha-start.js",
+    "package.json",
+    "package-lock.json",
+    "playwright.config.js",
+}
 
 
 def snapshot_dir_stats(somedir):
@@ -43,8 +54,8 @@ def get_paths(config) -> (Path, Path, Path):
     if config.www_folder == "":
         www_path = reporoot.joinpath("www")
     src_dir = www_path.joinpath("src")
-    # if www_folder is a hugo page, build it
-    if src_dir.joinpath("index.md").is_file():
+    # Build if markdown or ready-made html homepage is present.
+    if src_dir.joinpath("index.md").is_file() or src_dir.joinpath("index.html").is_file():
         build_dir = www_path.joinpath("build")
     # if it is not a hugo page, upload it as is
     else:
@@ -86,13 +97,23 @@ def int_to_english(number):
 def _build_webpages(src_dir, build_dir, config):
     mail_domain = config.mail_domain
     assert src_dir.exists(), src_dir
-    if not build_dir.exists():
-        build_dir.mkdir()
+    build_dir.mkdir(parents=True, exist_ok=True)
+    for path in build_dir.iterdir():
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
 
     qr_path = build_dir.joinpath(f"qr-chatmail-invite-{mail_domain}.png")
     qr_path.write_bytes(gen_qr_png_data(mail_domain).read())
 
+    explicit_html_names = {
+        path.name for path in src_dir.iterdir() if path.is_file() and path.suffix == ".html"
+    }
+
     for path in src_dir.iterdir():
+        if not _should_copy_path(path):
+            continue
         if path.suffix == ".md":
             render_vars, content = prepare_template(path)
             render_vars["username_min_length"] = int_to_english(
@@ -105,6 +126,8 @@ def _build_webpages(src_dir, build_dir, config):
                 config.password_min_length
             )
             target = build_dir.joinpath(path.stem + ".html")
+            if target.name in explicit_html_names:
+                continue
 
             # recursive jinja2 rendering
             while 1:
@@ -117,8 +140,32 @@ def _build_webpages(src_dir, build_dir, config):
                 f.write(content)
         elif path.name != "page-layout.html":
             target = build_dir.joinpath(path.name)
-            target.write_bytes(path.read_bytes())
+            if path.is_dir():
+                _copy_dir(path, target)
+            else:
+                target.write_bytes(path.read_bytes())
     return build_dir
+
+
+def _copy_dir(src: Path, dst: Path) -> None:
+    dst.mkdir(parents=True, exist_ok=True)
+    for child in src.iterdir():
+        if not _should_copy_path(child):
+            continue
+        if child.is_dir():
+            _copy_dir(child, dst.joinpath(child.name))
+        else:
+            dst.joinpath(child.name).write_bytes(child.read_bytes())
+
+
+def _should_copy_path(path: Path) -> bool:
+    if path.is_dir():
+        return path.name not in _SKIP_DIR_NAMES
+    if path.name in _SKIP_FILE_NAMES:
+        return False
+    if path.name.startswith("ui-test-"):
+        return False
+    return True
 
 
 def find_merge_conflict(src_dir) -> Path:

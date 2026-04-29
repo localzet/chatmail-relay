@@ -278,7 +278,9 @@ class WebsiteDeployer(Deployer):
                     return
             # if it is not a hugo page, upload it as is
             files.rsync(
-                f"{www_path}/", "/var/www/html", flags=["-avz", "--chown=www-data"]
+                f"{www_path}/",
+                "/var/www/html",
+                flags=["-avz", "--delete", "--chown=www-data"],
             )
 
 
