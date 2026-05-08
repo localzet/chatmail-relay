@@ -31,6 +31,7 @@ from .basedeploy import (
 )
 from .dovecot.deployer import DovecotDeployer
 from .external.deployer import ExternalTlsDeployer
+from .fail2ban.deployer import Fail2BanDeployer
 from .filtermail.deployer import FiltermailDeployer
 from .mtail.deployer import MtailDeployer
 from .nginx.deployer import NginxDeployer
@@ -656,6 +657,7 @@ def deploy_chatmail(config_path: Path, disable_mail: bool, website_only: bool) -
         # because it creates authentication socket
         # required by Postfix.
         DovecotDeployer(config, disable_mail),
+        Fail2BanDeployer(),
         PostfixDeployer(config, disable_mail),
         FcgiwrapDeployer(),
         NginxDeployer(config),
