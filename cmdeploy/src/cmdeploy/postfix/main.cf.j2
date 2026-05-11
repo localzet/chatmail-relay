@@ -28,6 +28,7 @@ smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
 smtp_tls_policy_maps = regexp:/etc/postfix/smtp_tls_policy_map
 smtp_tls_protocols = >=TLSv1.2
 smtp_tls_mandatory_protocols = >=TLSv1.2
+smtp_address_preference = ipv4
 
 # Disable anonymous cipher suites
 # and known insecure algorithms.

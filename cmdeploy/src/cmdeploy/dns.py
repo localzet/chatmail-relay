@@ -33,6 +33,9 @@ def check_initial_remote_data(remote_data, *, strict_tls=True, print=print):
     elif strict_tls and remote_data["WWW"] != f"{mail_domain}.":
         print("Missing www CNAME record:")
         print(f"www.{mail_domain}.   CNAME  {mail_domain}.")
+    elif strict_tls and remote_data["ADMIN"] != f"{mail_domain}.":
+        print("Missing admin CNAME record:")
+        print(f"admin.{mail_domain}.   CNAME  {mail_domain}.")
     else:
         return remote_data
 
@@ -57,6 +60,7 @@ def get_filled_zone_file(remote_data):
         append_record(f"_mta-sts.{d}.", "TXT", f'"v=STSv1; id={remote_data["sts_id"]}"')
         append_record(f"mta-sts.{d}.", "CNAME", f"{d}.")
     append_record(f"www.{d}.", "CNAME", f"{d}.")
+    append_record(f"admin.{d}.", "CNAME", f"{d}.")
     lines.append(remote_data["dkim_entry"])
     lines.append("")
     lines.append("; Recommended DNS entries")

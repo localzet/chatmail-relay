@@ -92,6 +92,7 @@ class TestPerformInitialChecks:
             remote_data["MTA_STS"] == mockdns_expected["CNAME"]["mta-sts.some.domain"]
         )
         assert remote_data["WWW"] == mockdns_expected["CNAME"]["www.some.domain"]
+        assert remote_data["ADMIN"] == mockdns_expected["CNAME"]["admin.some.domain"]
 
     @pytest.mark.parametrize("drop", ["A", "AAAA"])
     def test_perform_initial_checks_with_one_of_A_AAAA(self, mockdns, drop):

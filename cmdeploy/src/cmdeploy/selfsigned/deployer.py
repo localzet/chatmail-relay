@@ -9,7 +9,7 @@ def openssl_selfsigned_args(domain, cert_path, key_path, days=36500):
     """Return the openssl argument list for a self-signed certificate.
 
     The certificate uses an EC P-256 key with SAN entries for *domain*,
-    ``www.<domain>`` and ``mta-sts.<domain>``.
+    ``www.<domain>``, ``admin.<domain>`` and ``mta-sts.<domain>``.
     """
     return [
         "openssl", "req", "-x509",
@@ -22,7 +22,7 @@ def openssl_selfsigned_args(domain, cert_path, key_path, days=36500):
         "-addext", "basicConstraints=critical,CA:FALSE",
         "-addext", "extendedKeyUsage=serverAuth,clientAuth",
         "-addext",
-        f"subjectAltName=DNS:{domain},DNS:www.{domain},DNS:mta-sts.{domain}",
+        f"subjectAltName=DNS:{domain},DNS:www.{domain},DNS:mta-sts.{domain},DNS:admin.{domain}",
     ]
 
 

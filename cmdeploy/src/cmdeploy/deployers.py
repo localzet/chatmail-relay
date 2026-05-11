@@ -566,7 +566,7 @@ class GithashDeployer(Deployer):
 
 def get_tls_deployer(config, mail_domain):
     """Select the appropriate TLS deployer based on config."""
-    tls_domains = [mail_domain, f"mta-sts.{mail_domain}", f"www.{mail_domain}"]
+    tls_domains = [mail_domain, f"mta-sts.{mail_domain}", f"www.{mail_domain}", f"admin.{mail_domain}"]
 
     if config.tls_cert_mode == "acme":
         return AcmetoolDeployer(config.acme_email, tls_domains)
