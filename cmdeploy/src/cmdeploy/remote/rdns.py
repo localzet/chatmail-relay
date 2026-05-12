@@ -77,21 +77,37 @@ def get_dkim_entry(mail_domain, pre_command, dkim_selector):
 
 
 def query_dns(typ, domain):
-    # Get autoritative nameserver from the SOA record.
-    soa_answers = [
-        x.split()
-        for x in shell(
-            f"dig -r -q {domain} -t SOA +noall +authority +answer", print=log_progress
-        ).split("\n")
-    ]
-    soa = [a for a in soa_answers if len(a) >= 3 and a[3] == "SOA"]
-    if not soa:
+    ns = query_authoritative_nameserver(domain)
+    if not ns:
         return
-    ns = soa[0][4]
 
     # Query authoritative nameserver directly to bypass DNS cache.
     res = shell(f"dig @{ns} -r -q {domain} -t {typ} +short", print=log_progress)
     return next((line for line in res.split("\n") if not line.startswith(";")), "")
+
+
+def query_authoritative_nameserver(domain):
+    labels = domain.rstrip(".").split(".")
+    for index in range(len(labels) - 1):
+        candidate = ".".join(labels[index:])
+        soa = query_soa(candidate)
+        if soa:
+            return soa[4]
+    return None
+
+
+def query_soa(domain):
+    answers = [
+        x.split()
+        for x in shell(
+            f"dig -r -q {domain} -t SOA +noall +authority +answer",
+            print=log_progress,
+        ).split("\n")
+    ]
+    return next(
+        (answer for answer in answers if len(answer) >= 5 and answer[3] == "SOA"),
+        None,
+    )
 
 
 def query_alias_or_same_address(domain, target_domain, target_a, target_aaaa):

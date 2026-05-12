@@ -15,9 +15,14 @@ def mockdns_base(monkeypatch):
             if command == "dig":
                 return "."
             if "SOA" in command:
-                return (
-                    "delta.chat. 21600 IN SOA ns1.first-ns.de. dns.hetzner.com."
-                    " 2025102800 14400 1800 604800 3600"
+                command_chunks = command.split()
+                domain = command_chunks[3]
+                return qdict.get("SOA", {}).get(
+                    domain,
+                    (
+                        "delta.chat. 21600 IN SOA ns1.first-ns.de. dns.hetzner.com."
+                        " 2025102800 14400 1800 604800 3600"
+                    ),
                 )
             command_chunks = command.split()
             domain, typ = command_chunks[4], command_chunks[6]
@@ -129,6 +134,19 @@ class TestPerformInitialChecks:
     def test_perform_initial_checks_accepts_admin_a_record(self, mockdns):
         del mockdns["CNAME"]["admin.some.domain"]
         mockdns["A"]["admin.some.domain"] = mockdns["A"]["some.domain"]
+
+        remote_data = remote.rdns.perform_initial_checks("some.domain")
+
+        assert remote_data["MTA_STS"] == "some.domain."
+        assert remote_data["WWW"] == "some.domain."
+        assert remote_data["ADMIN"] == "some.domain."
+        assert check_initial_remote_data(remote_data)
+
+    def test_perform_initial_checks_uses_parent_zone_soa(self, mockdns):
+        mockdns["SOA"] = {
+            "some.domain": "",
+            "domain": "domain. 21600 IN SOA ns1.example.org. dns.example.org.",
+        }
 
         remote_data = remote.rdns.perform_initial_checks("some.domain")
 
