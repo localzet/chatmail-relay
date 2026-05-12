@@ -7,9 +7,11 @@ import argparse
 import importlib.resources
 import os
 import pathlib
+import secrets
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import pyinfra
@@ -87,7 +89,7 @@ def run_cmd_options(parser):
 def run_cmd(args, out):
     """Deploy chatmail services on the remote server."""
 
-    ssh_host = args.ssh_host if args.ssh_host else args.config.mail_domain
+    ssh_host = args.ssh_host
     sshexec = get_sshexec(ssh_host)
     require_iroh = args.config.enable_iroh_relay
     strict_tls = args.config.tls_cert_mode == "acme"
@@ -127,6 +129,116 @@ def run_cmd(args, out):
         return 1
 
 
+def adm_cmd_options(parser):
+    parser.add_argument(
+        "--version",
+        default="latest",
+        help="chatmail-control release tag to install, or 'latest'",
+    )
+    parser.add_argument(
+        "--no-start",
+        dest="start_service",
+        action="store_false",
+        default=True,
+        help="install and enable chatmail-control without starting the service",
+    )
+
+
+def adm_cmd(args, out):
+    """Install or upgrade Chatmail Control admin panel."""
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        out.red(
+            "cmdeploy adm must be run as root because it writes to /etc and systemd."
+        )
+        return 1
+
+    installer_url = (
+        "https://raw.githubusercontent.com/localzet/chatmail-control/main/scripts/install.sh"
+    )
+    install_args = ["--version", args.version]
+    if args.start_service:
+        install_args.append("--start")
+
+    public_url = f"https://admin.{args.config.mail_domain}"
+
+    try:
+        out.green(f"Downloading Chatmail Control installer from {installer_url}")
+        with urllib.request.urlopen(installer_url, timeout=60) as response:
+            installer = response.read()
+
+        out.run(["bash", "-s", "--", *install_args], input=installer)
+        update_chatmail_control_config(
+            Path("/etc/chatmail-control/config.toml"),
+            public_url=public_url,
+            mail_domain=args.config.mail_domain,
+        )
+        out.green(f"Chatmail Control installed for {public_url}.")
+        out.green(
+            "Create the first admin with: "
+            "chatmail-control admin create --username admin --password 'CHANGE_ME'"
+        )
+        return 0
+    except (OSError, subprocess.CalledProcessError) as ex:
+        out.red(ex)
+        out.red("Chatmail Control installation failed")
+        return 1
+
+
+def update_chatmail_control_config(config_path, *, public_url, mail_domain):
+    text = config_path.read_text()
+    updates = {
+        "server": {
+            "public_url": public_url,
+            "secure_cookies": True,
+        },
+        "auth": {},
+        "health": {
+            "domain": mail_domain,
+        },
+    }
+    if "CHANGE_ME_64_RANDOM_CHARS" in text:
+        updates["auth"]["session_secret"] = secrets.token_hex(32)
+
+    lines = text.splitlines()
+    result = []
+    section = None
+    seen = {name: set() for name in updates}
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            append_missing_chatmail_control_settings(result, updates, seen, section)
+            section = stripped.strip("[]")
+            result.append(line)
+            continue
+
+        if section in updates and "=" in line and not stripped.startswith("#"):
+            key = line.split("=", 1)[0].strip()
+            if key in updates[section]:
+                result.append(f"{key} = {render_toml_value(updates[section][key])}")
+                seen[section].add(key)
+                continue
+
+        result.append(line)
+
+    append_missing_chatmail_control_settings(result, updates, seen, section)
+    config_path.write_text("\n".join(result) + "\n")
+
+
+def append_missing_chatmail_control_settings(result, updates, seen, section):
+    if section not in updates:
+        return
+    for key, value in updates[section].items():
+        if key not in seen[section]:
+            result.append(f"{key} = {render_toml_value(value)}")
+
+
+def render_toml_value(value):
+    if isinstance(value, bool):
+        return str(value).lower()
+    return repr(value).replace("'", '"')
+
+
 def dns_cmd_options(parser):
     parser.add_argument(
         "--zonefile",
@@ -140,7 +252,7 @@ def dns_cmd_options(parser):
 
 def dns_cmd(args, out):
     """Check DNS entries and optionally generate dns zone file."""
-    ssh_host = args.ssh_host if args.ssh_host else args.config.mail_domain
+    ssh_host = args.ssh_host
     sshexec = get_sshexec(ssh_host, verbose=args.verbose)
     tls_cert_mode = args.config.tls_cert_mode
     strict_tls = tls_cert_mode == "acme"
@@ -177,7 +289,7 @@ def status_cmd_options(parser):
 def status_cmd(args, out):
     """Display status for online chatmail instance."""
 
-    ssh_host = args.ssh_host if args.ssh_host else args.config.mail_domain
+    ssh_host = args.ssh_host
     sshexec = get_sshexec(ssh_host, verbose=args.verbose)
 
     out.green(f"chatmail domain: {args.config.mail_domain}")
@@ -298,13 +410,20 @@ class Out:
         proc = subprocess.run(args, env=env, check=False)
         return proc.returncode
 
+    def run(self, args, *, input=None, env=None, quiet=False):
+        if not quiet:
+            cmdstring = " ".join(args)
+            self(f"[$ {cmdstring}]", file=sys.stderr)
+        return subprocess.run(args, input=input, env=env, check=True)
+
 
 def add_ssh_host_option(parser):
     parser.add_argument(
         "--ssh-host",
         dest="ssh_host",
+        default="localhost",
         help="Run commands on 'localhost' or on a specific SSH host "
-        "instead of chatmail.ini's mail_domain.",
+        "instead of chatmail.ini's mail_domain (default: localhost).",
     )
 
 

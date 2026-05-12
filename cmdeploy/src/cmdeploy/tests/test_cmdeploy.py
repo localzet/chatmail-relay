@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from cmdeploy.cmdeploy import get_parser, main
+from cmdeploy.cmdeploy import get_parser, main, update_chatmail_control_config
 from cmdeploy.www import get_paths
 
 
@@ -21,7 +21,9 @@ class TestCmdline:
         parser.parse_args([])
         init = parser.parse_args(["init", "chat.example.org"])
         run = parser.parse_args(["run"])
-        assert init and run
+        adm = parser.parse_args(["adm"])
+        assert init and run and adm
+        assert run.ssh_host == "localhost"
 
     def test_init_not_overwrite(self, capsys, tmp_path, monkeypatch):
         monkeypatch.delenv("CHATMAIL_INI", raising=False)
@@ -38,6 +40,37 @@ class TestCmdline:
         assert main(args) == 0
         out, err = capsys.readouterr()
         assert "deleting config file" in out.lower()
+
+    def test_update_chatmail_control_config(self, tmp_path):
+        config = tmp_path / "config.toml"
+        config.write_text(
+            "\n".join(
+                [
+                    "[server]",
+                    'public_url = "https://admin.example.com"',
+                    "secure_cookies = false",
+                    "",
+                    "[auth]",
+                    'session_secret = "CHANGE_ME_64_RANDOM_CHARS"',
+                    "",
+                    "[health]",
+                    'domain = "example.com"',
+                    "",
+                ]
+            )
+        )
+
+        update_chatmail_control_config(
+            config,
+            public_url="https://admin.chat.example.org",
+            mail_domain="chat.example.org",
+        )
+
+        text = config.read_text()
+        assert 'public_url = "https://admin.chat.example.org"' in text
+        assert "secure_cookies = true" in text
+        assert 'domain = "chat.example.org"' in text
+        assert "CHANGE_ME_64_RANDOM_CHARS" not in text
 
 
 def test_www_folder(example_config, tmp_path):

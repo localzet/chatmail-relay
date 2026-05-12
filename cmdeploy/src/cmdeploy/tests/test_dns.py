@@ -39,6 +39,7 @@ def mockdns_expected():
         "CNAME": {
             "mta-sts.some.domain": "some.domain.",
             "www.some.domain": "some.domain.",
+            "admin.some.domain": "some.domain.",
         },
     }
 
@@ -124,6 +125,15 @@ class TestPerformInitialChecks:
         res = check_initial_remote_data(remote_data, strict_tls=False, print=l.append)
         assert res
         assert not l
+
+    def test_perform_initial_checks_accepts_admin_a_record(self, mockdns):
+        del mockdns["CNAME"]["admin.some.domain"]
+        mockdns["A"]["admin.some.domain"] = mockdns["A"]["some.domain"]
+
+        remote_data = remote.rdns.perform_initial_checks("some.domain")
+
+        assert remote_data["ADMIN"] == "some.domain."
+        assert check_initial_remote_data(remote_data)
 
 
 def test_parse_zone_records():

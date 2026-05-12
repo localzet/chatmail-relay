@@ -22,11 +22,22 @@ def perform_initial_checks(mail_domain, pre_command=""):
         shell("apt-get update && apt-get install -y dnsutils", print=log_progress)
     A = query_dns("A", mail_domain)
     AAAA = query_dns("AAAA", mail_domain)
-    MTA_STS = query_dns("CNAME", f"mta-sts.{mail_domain}")
-    WWW = query_dns("CNAME", f"www.{mail_domain}")
-    ADMIN = query_dns("CNAME", f"admin.{mail_domain}")
+    MTA_STS = query_alias_or_same_address(
+        f"mta-sts.{mail_domain}", mail_domain, A, AAAA
+    )
+    WWW = query_alias_or_same_address(f"www.{mail_domain}", mail_domain, A, AAAA)
+    ADMIN = query_alias_or_same_address(
+        f"admin.{mail_domain}", mail_domain, A, AAAA
+    )
 
-    res = dict(mail_domain=mail_domain, A=A, AAAA=AAAA, MTA_STS=MTA_STS, WWW=WWW, ADMIN=ADMIN)
+    res = dict(
+        mail_domain=mail_domain,
+        A=A,
+        AAAA=AAAA,
+        MTA_STS=MTA_STS,
+        WWW=WWW,
+        ADMIN=ADMIN,
+    )
     res["acme_account_url"] = shell(
         pre_command + "acmetool account-url", fail_ok=True, print=log_progress
     )
@@ -83,6 +94,30 @@ def query_dns(typ, domain):
     return next((line for line in res.split("\n") if not line.startswith(";")), "")
 
 
+def query_alias_or_same_address(domain, target_domain, target_a, target_aaaa):
+    cname = query_dns("CNAME", domain)
+    if cname:
+        return cname
+
+    domain_a = query_dns("A", domain)
+    domain_aaaa = query_dns("AAAA", domain)
+    if (target_a and domain_a == target_a) or (
+        target_aaaa and domain_aaaa == target_aaaa
+    ):
+        return f"{target_domain}."
+
+    return ""
+
+
+def cname_or_same_address_matches(domain, target_domain):
+    target_domain = target_domain.rstrip(".")
+    target_a = query_dns("A", target_domain)
+    target_aaaa = query_dns("AAAA", target_domain)
+    return query_alias_or_same_address(domain, target_domain, target_a, target_aaaa) == (
+        f"{target_domain}."
+    )
+
+
 def check_zonefile(zonefile, verbose=True):
     """Check expected zone file entries."""
     required = True
@@ -100,7 +135,9 @@ def check_zonefile(zonefile, verbose=True):
         zf_domain = zf_domain.rstrip(".")
         zf_value = zf_value.strip()
         query_value = query_dns(zf_typ, zf_domain)
-        if zf_value != query_value:
+        if zf_value != query_value and not (
+            zf_typ == "CNAME" and cname_or_same_address_matches(zf_domain, zf_value)
+        ):
             assert zf_typ in ("A", "AAAA", "CNAME", "CAA", "SRV", "MX", "TXT"), zf_line
             if required:
                 required_diff.append(zf_line)
