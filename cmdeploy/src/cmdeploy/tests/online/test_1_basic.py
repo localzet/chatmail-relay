@@ -129,7 +129,7 @@ def test_maildir_tree_is_writable_for_vmail(sshdomain):
 
 
 def test_timezone_env(remote):
-    for line in remote.iter_output("env"):
+    for line in remote.iter_output("cat /etc/environment"):
         print(line)
         if line == "tz=:/etc/localtime":
             return

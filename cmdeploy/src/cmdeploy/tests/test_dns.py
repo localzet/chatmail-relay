@@ -19,10 +19,8 @@ def mockdns_base(monkeypatch):
                 domain = command_chunks[3]
                 return qdict.get("SOA", {}).get(
                     domain,
-                    (
-                        "delta.chat. 21600 IN SOA ns1.first-ns.de. dns.hetzner.com."
-                        " 2025102800 14400 1800 604800 3600"
-                    ),
+                    f"{domain}. 21600 IN SOA ns1.first-ns.de. dns.hetzner.com."
+                    " 2025102800 14400 1800 604800 3600",
                 )
             command_chunks = command.split()
             domain, typ = command_chunks[4], command_chunks[6]
